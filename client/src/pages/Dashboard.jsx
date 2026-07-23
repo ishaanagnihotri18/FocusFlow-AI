@@ -5,30 +5,19 @@ import StatsCards from "../components/StatsCards";
 import TaskCard from "../components/TaskCard";
 import AddTaskModal from "../components/AddTaskModal";
 import AICoach from "../components/AICoach";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+
+import {
+  loadTasks,
+  saveTasks,
+} from "../utils/taskStorage";
 
 export default function Dashboard() {
+  // =========================
+  // State
+  // =========================
 
-  const defaultTasks = [
-    {
-      id: 1,
-      title: "Complete Tesla ML Assignment",
-      priority: "High",
-      deadline: "2026-07-01",
-      completed: false,
-    },
-    {
-      id: 2,
-      title: "Practice LeetCode",
-      priority: "Medium",
-      deadline: "2026-07-02",
-      completed: false,
-    },
-  ];
-
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("focusflow_tasks");
-    return saved ? JSON.parse(saved) : defaultTasks;
-  });
+  const [tasks, setTasks] = useState(() => loadTasks());
 
   const [showModal, setShowModal] = useState(false);
 
@@ -38,34 +27,33 @@ export default function Dashboard() {
     deadline: "",
   });
 
+  // =========================
+  // Save tasks
+  // =========================
+
   useEffect(() => {
-    localStorage.setItem(
-      "focusflow_tasks",
-      JSON.stringify(tasks)
-    );
+    saveTasks(tasks);
   }, [tasks]);
 
-  const handleAddTask = () => {
+  // =========================
+  // Add task
+  // =========================
 
-    if (
-      !newTask.title.trim() ||
-      !newTask.deadline
-    ) {
+  const handleAddTask = () => {
+    if (!newTask.title.trim() || !newTask.deadline) {
       toast.warning("Please fill all fields!");
       return;
     }
 
     const task = {
       id: Date.now(),
-      title: newTask.title,
+      title: newTask.title.trim(),
       priority: newTask.priority,
       deadline: newTask.deadline,
       completed: false,
     };
 
-    setTasks(prev => [...prev, task]);
-
-    toast.success("Task added successfully!");
+    setTasks((prev) => [...prev, task]);
 
     setNewTask({
       title: "",
@@ -75,12 +63,16 @@ export default function Dashboard() {
 
     setShowModal(false);
 
+    toast.success("Task added successfully!");
   };
 
-  const toggleComplete = (id) => {
+  // =========================
+  // Complete task
+  // =========================
 
-    setTasks(prev =>
-      prev.map(task =>
+  const toggleComplete = (id) => {
+    setTasks((prev) =>
+      prev.map((task) =>
         task.id === id
           ? {
               ...task,
@@ -89,18 +81,40 @@ export default function Dashboard() {
           : task
       )
     );
-
   };
 
-  const deleteTask = (id) => {
+  // =========================
+  // Delete task
+  // =========================
 
-    setTasks(prev =>
-      prev.filter(task => task.id !== id)
+  const deleteTask = (id) => {
+    setTasks((prev) =>
+      prev.filter((task) => task.id !== id)
     );
 
     toast.success("Task deleted!");
-
   };
+
+  // =========================
+  // Dashboard data
+  // =========================
+
+  const completedTasks = tasks.filter(
+    (task) => task.completed
+  ).length;
+
+  const pendingTasks = tasks.length - completedTasks;
+
+  const productivityScore =
+    tasks.length === 0
+      ? 100
+      : Math.round(
+          (completedTasks / tasks.length) * 100
+        );
+
+  // =========================
+  // Greeting
+  // =========================
 
   const hour = new Date().getHours();
 
@@ -111,271 +125,167 @@ export default function Dashboard() {
       ? "Good Afternoon, Ishaan"
       : "Good Evening, Ishaan";
 
-  const completed =
-    tasks.filter(t => t.completed).length;
+  // =========================
+  // Upcoming deadlines
+  // =========================
 
-  const score =
-    tasks.length === 0
-      ? 100
-      : Math.round((completed / tasks.length) * 100);
+  const upcomingTasks = [...tasks]
+    .filter((task) => !task.completed && task.deadline)
+    .sort(
+      (a, b) =>
+        new Date(a.deadline) - new Date(b.deadline)
+    )
+    .slice(0, 3);
+
+  const formatDeadline = (deadline) => {
+    if (!deadline) return "No deadline";
+
+    const date = new Date(`${deadline}T00:00:00`);
+
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // =========================
+  // UI
+  // =========================
 
   return (
     <>
-
       {/* Header */}
 
-      <div className="flex justify-between items-center">
+      <DashboardHeader
+        greeting={greeting}
+        pendingTasks={pendingTasks}
+        productivityScore={productivityScore}
+        onAddTask={() => setShowModal(true)}
+      />
 
-        <div>
-
-          <h1 className="text-4xl font-bold">
-            {greeting} 👋
-          </h1>
-
-          <p className="text-gray-400 mt-2">
-            Stay focused and let AI plan your day.
-          </p>
-
-        </div>
-
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-cyan-500 hover:bg-cyan-600 transition-all px-6 py-3 rounded-xl font-semibold"
-        >
-          + Add Task
-        </button>
-
-      </div>
+      {/* Stats */}
 
       <StatsCards tasks={tasks} />
 
-      {/* Premium Widgets */}
+      {/* Upcoming Deadlines */}
 
-      <div className="grid grid-cols-2 gap-6 mt-10">
+      <section className="mt-10">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              🔥 Upcoming Deadlines
+            </h2>
 
-        {/* Productivity */}
-
-        <div className="bg-slate-800 rounded-2xl p-8">
-
-          <h2 className="text-xl font-bold mb-6">
-            ⭕ Productivity Score
-          </h2>
-
-          <div className="w-36 h-36 mx-auto rounded-full border-[10px] border-cyan-500 flex items-center justify-center">
-
-            <span className="text-4xl font-bold text-cyan-400">
-              {score}%
-            </span>
-
+            <p className="text-gray-400 mt-1">
+              Your nearest pending deadlines.
+            </p>
           </div>
-
-         <p className="text-center text-gray-400 mt-6">
-  {score >= 80
-    ? "Excellent Productivity 🚀"
-    : score >= 50
-    ? "Good Progress 👍"
-    : "Let's Get Moving 💪"}
-</p>
-
         </div>
 
-        {/* Upcoming Deadlines */}
+        {upcomingTasks.length === 0 ? (
+          <div className="bg-slate-800 rounded-2xl p-8 text-center">
+            <p className="text-lg font-semibold text-green-400">
+              🎉 No pending deadlines
+            </p>
 
-        <div className="bg-slate-800 rounded-2xl p-8">
+            <p className="text-gray-400 mt-2">
+              You're all caught up.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {upcomingTasks.map((task) => (
+              <div
+                key={task.id}
+                className="bg-slate-800 border border-slate-700 rounded-2xl p-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="font-semibold text-lg text-white">
+                    {task.title}
+                  </h3>
 
-          <h2 className="text-xl font-bold mb-6">
-            🔥 Upcoming Deadlines
-          </h2>
-
-          <div className="space-y-4">
-
-            {tasks
-              .filter(task => !task.completed)
-              .sort(
-                (a, b) =>
-                  new Date(a.deadline) -
-                  new Date(b.deadline)
-              )
-              .slice(0, 3)
-              .map(task => (
-
-                <div
-                  key={task.id}
-                  className="bg-slate-900 rounded-xl p-4 flex justify-between items-center"
-                >
-
-                  <div>
-
-                    <h3 className="font-semibold">
-                      {task.title}
-                    </h3>
-
-                    <p className="text-sm text-gray-400">
-                      {task.deadline}
-                    </p>
-
-                  </div>
-
-                  <span className={`font-bold ${
-                    task.priority === "High"
-                      ? "text-red-400"
-                      : task.priority === "Medium"
-                      ? "text-yellow-400"
-                      : "text-green-400"
-                  }`}>
+                  <span
+                    className={`text-sm font-bold ${
+                      task.priority === "High"
+                        ? "text-red-400"
+                        : task.priority === "Medium"
+                        ? "text-yellow-400"
+                        : "text-green-400"
+                    }`}
+                  >
                     {task.priority}
                   </span>
-
                 </div>
 
-              ))}
-
+                <p className="text-gray-400 mt-4">
+                  📅 {formatDeadline(task.deadline)}
+                </p>
+              </div>
+            ))}
           </div>
-
-        </div>
-
-      </div>
-
-      {/* AI Coach */}
-
-      <div className="mt-12">
-
-        <AICoach tasks={tasks} />
-
-        <div className="mt-4 bg-cyan-500/10 border border-cyan-400 rounded-xl p-4">
-
-          <h3 className="font-bold text-cyan-300">
-            ⚡ AI Daily Focus
-          </h3>
-
-          <p className="text-gray-300 mt-2 leading-7">
-            Prioritize high-priority tasks first, complete medium-priority
-            tasks after lunch, and reserve your evenings for revision,
-            planning, or learning.
-          </p>
-
-        </div>
-
-      </div>
+        )}
+      </section>
 
       {/* Today's Tasks */}
 
-      <div className="mt-12">
+      <section className="mt-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              📋 Your Tasks
+            </h2>
 
-        <div className="flex justify-between items-center mb-6">
-
-          <h2 className="text-2xl font-bold">
-            Today's Tasks
-          </h2>
+            <p className="text-gray-400 mt-1">
+              Manage your current workload.
+            </p>
+          </div>
 
           <span className="text-gray-400">
-            {tasks.length} {tasks.length === 1 ? "Task" : "Tasks"}
+            {tasks.length}{" "}
+            {tasks.length === 1 ? "Task" : "Tasks"}
           </span>
-
         </div>
 
         {tasks.length === 0 ? (
-
-          <div className="bg-slate-800 rounded-2xl p-10 text-center">
-
-            <h3 className="text-2xl font-bold">
+          <div className="bg-slate-800 border border-dashed border-slate-700 rounded-2xl p-10 text-center">
+            <h3 className="text-xl font-bold text-white">
               🚀 Ready to get productive?
             </h3>
 
             <p className="text-gray-400 mt-3">
-              Add your first task and let Gemini generate your personalized plan.
+              Add your first task to start planning your
+              work.
             </p>
 
+            <button
+              onClick={() => setShowModal(true)}
+              className="mt-6 bg-cyan-500 hover:bg-cyan-600 px-6 py-3 rounded-xl font-semibold transition-all"
+            >
+              + Add Your First Task
+            </button>
           </div>
-
         ) : (
-
           <div className="space-y-5">
-
-            {tasks.map(task => (
-
+            {tasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
                 toggleComplete={toggleComplete}
                 deleteTask={deleteTask}
               />
-
             ))}
-
           </div>
-
         )}
+      </section>
 
-      </div>
+      {/* AI Coach */}
 
-      {/* Bottom Cards */}
+      <section className="mt-12">
+        <AICoach tasks={tasks} />
+      </section>
 
-      <div className="mt-12 grid grid-cols-2 gap-6">
-
-        <div className="bg-slate-800 rounded-2xl p-6">
-
-          <h2 className="text-xl font-bold mb-5">
-            📈 Productivity Insights
-          </h2>
-
-          <ul className="space-y-4">
-
-            <li>
-              ✅ Completed :
-              <span className="text-green-400 font-bold ml-2">
-                {completed}
-              </span>
-            </li>
-
-            <li>
-              ⏳ Pending :
-              <span className="text-yellow-400 font-bold ml-2">
-                {tasks.length - completed}
-              </span>
-            </li>
-
-            <li>
-              🔥 High Priority :
-              <span className="text-red-400 font-bold ml-2">
-                {tasks.filter(t => t.priority === "High").length}
-              </span>
-            </li>
-
-            <li>
-              📊 Productivity :
-              <span className="text-cyan-400 font-bold ml-2">
-                {score}%
-              </span>
-            </li>
-
-          </ul>
-
-        </div>
-
-        <div className="bg-slate-800 rounded-2xl p-6">
-
-          <h2 className="text-xl font-bold mb-5">
-            💡 Smart Suggestions
-          </h2>
-
-          <ul className="space-y-4 text-gray-300">
-
-            <li>• Complete high priority tasks first.</li>
-
-            <li>• Break large tasks into smaller ones.</li>
-
-            <li>• Use AI Planner every morning.</li>
-
-            <li>• Review tomorrow's work before sleeping.</li>
-
-            <li>• Stay consistent rather than working in long bursts.</li>
-
-          </ul>
-
-        </div>
-
-      </div>
+      {/* Add Task Modal */}
 
       <AddTaskModal
         showModal={showModal}
@@ -384,7 +294,6 @@ export default function Dashboard() {
         setNewTask={setNewTask}
         handleAddTask={handleAddTask}
       />
-
     </>
   );
 }

@@ -3,6 +3,7 @@ import {
   FaTasks,
   FaRobot,
   FaChartBar,
+  FaCalendarAlt,
   FaCog,
 } from "react-icons/fa";
 
@@ -29,6 +30,11 @@ const menuItems = [
     label: "Analytics",
     path: "/analytics",
   },
+  {
+  icon: <FaCalendarAlt />,
+  label: "Calendar",
+  path: "/calendar",
+},
   {
     icon: <FaCog />,
     label: "Settings",

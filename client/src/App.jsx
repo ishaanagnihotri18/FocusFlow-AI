@@ -8,6 +8,7 @@ import Tasks from "./pages/Tasks";
 import AIPlanner from "./pages/AIPlanner";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
+import Calendar from "./pages/Calendar";
 
 function App() {
   return (
@@ -23,6 +24,8 @@ function App() {
           <Route path="/ai-planner" element={<AIPlanner />} />
 
           <Route path="/analytics" element={<Analytics />} />
+
+          <Route path="/calendar" element={<Calendar />} />
 
           <Route path="/settings" element={<Settings />} />
 

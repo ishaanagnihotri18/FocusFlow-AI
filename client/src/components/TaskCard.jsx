@@ -1,4 +1,8 @@
-import { FaCheckCircle, FaRegCircle, FaTrash } from "react-icons/fa";
+import {
+  FaCheckCircle,
+  FaRegCircle,
+  FaTrash,
+} from "react-icons/fa";
 
 export default function TaskCard({
   task,
@@ -12,28 +16,60 @@ export default function TaskCard({
   };
 
   const getRisk = () => {
+    // Completed tasks are no longer at risk
+    if (task.completed) {
+      return "✅ Completed";
+    }
+
+    if (!task.deadline) {
+      return "⚪ No Deadline";
+    }
+
+    // Use local midnight to avoid time-related errors
     const today = new Date();
-    const deadline = new Date(task.deadline);
+    today.setHours(0, 0, 0, 0);
 
-    if (isNaN(deadline.getTime())) return "Unknown";
-
-    const diff = Math.ceil(
-      (deadline - today) / (1000 * 60 * 60 * 24)
+    const deadline = new Date(
+      `${task.deadline}T00:00:00`
     );
 
-    if (diff <= 1) return "🔴 High Risk";
-    if (diff <= 3) return "🟡 Medium Risk";
+    if (isNaN(deadline.getTime())) {
+      return "⚪ Unknown Deadline";
+    }
+
+    const diff = Math.round(
+      (deadline - today) /
+        (1000 * 60 * 60 * 24)
+    );
+
+    if (diff < 0) {
+      return "🔴 Overdue";
+    }
+
+    if (diff <= 1) {
+      return "🔴 High Risk";
+    }
+
+    if (diff <= 3) {
+      return "🟡 Medium Risk";
+    }
+
     return "🟢 Low Risk";
   };
 
   return (
     <div className="bg-slate-800 rounded-2xl p-5 flex justify-between items-center hover:shadow-lg hover:shadow-cyan-500/10 transition-all">
+      {/* Left */}
 
       <div className="flex items-start gap-4">
-
         <button
           onClick={() => toggleComplete(task.id)}
           className="mt-1 text-cyan-400 text-xl"
+          title={
+            task.completed
+              ? "Mark as pending"
+              : "Mark as completed"
+          }
         >
           {task.completed ? (
             <FaCheckCircle />
@@ -47,7 +83,7 @@ export default function TaskCard({
             className={`text-xl font-semibold ${
               task.completed
                 ? "line-through text-gray-500"
-                : ""
+                : "text-white"
             }`}
           >
             {task.title}
@@ -61,14 +97,15 @@ export default function TaskCard({
             {getRisk()}
           </p>
         </div>
-
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Right */}
 
+      <div className="flex items-center gap-3">
         <span
           className={`px-4 py-2 rounded-xl font-semibold ${
-            priorityColor[task.priority]
+            priorityColor[task.priority] ??
+            "bg-slate-600"
           }`}
         >
           {task.priority}
@@ -76,13 +113,12 @@ export default function TaskCard({
 
         <button
           onClick={() => deleteTask(task.id)}
-          className="text-red-400 hover:text-red-500 text-lg"
+          className="text-red-400 hover:text-red-500 text-lg transition"
+          title="Delete task"
         >
           <FaTrash />
         </button>
-
       </div>
-
     </div>
   );
 }

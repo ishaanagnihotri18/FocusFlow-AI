@@ -12,6 +12,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.json({
     message: "FocusFlow AI Backend Running 🚀",
+    backend: true,
+    geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
   });
 });
 
@@ -50,8 +52,8 @@ app.get("/test-gemini", async (req, res) => {
     });
   }
 });
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
