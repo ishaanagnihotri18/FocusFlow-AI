@@ -63,7 +63,7 @@ export default function TaskCard({
 
       <div className="flex items-start gap-4">
         <button
-          onClick={() => toggleComplete(task.id)}
+          onClick={() => toggleComplete(task._id)}
           className="mt-1 text-cyan-400 text-xl"
           title={
             task.completed
@@ -112,7 +112,7 @@ export default function TaskCard({
         </span>
 
         <button
-          onClick={() => deleteTask(task.id)}
+          onClick={() => deleteTask(task._id)}
           className="text-red-400 hover:text-red-500 text-lg transition"
           title="Delete task"
         >

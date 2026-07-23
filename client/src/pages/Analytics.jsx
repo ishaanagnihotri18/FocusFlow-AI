@@ -1,4 +1,5 @@
-import { loadTasks } from "../utils/taskStorage";
+import { useEffect, useState } from "react";
+import { API_BASE_URL } from "../utils/api";
 
 import {
   PieChart,
@@ -13,12 +14,55 @@ import {
   CartesianGrid,
 } from "recharts";
 
+
+const API_URL = `${API_BASE_URL}/api/tasks`;
+
 export default function Analytics() {
   // =========================
-  // Load Tasks
+  // State
   // =========================
 
-  const tasks = loadTasks();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // =========================
+  // Load Tasks From MongoDB
+  // =========================
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const token = localStorage.getItem(
+          "focusflow_token"
+        );
+
+        const response = await fetch(API_URL, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Unable to load analytics."
+          );
+        }
+
+        setTasks(data.tasks || []);
+      } catch (error) {
+        console.error(
+          "Analytics Load Error:",
+          error
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, []);
 
   // =========================
   // Statistics
@@ -30,21 +74,25 @@ export default function Analytics() {
     (task) => task.completed
   ).length;
 
-  const pendingTasks = totalTasks - completedTasks;
+  const pendingTasks =
+    totalTasks - completedTasks;
 
   const highPriority = tasks.filter(
     (task) =>
-      task.priority === "High" && !task.completed
+      task.priority === "High" &&
+      !task.completed
   ).length;
 
   const mediumPriority = tasks.filter(
     (task) =>
-      task.priority === "Medium" && !task.completed
+      task.priority === "Medium" &&
+      !task.completed
   ).length;
 
   const lowPriority = tasks.filter(
     (task) =>
-      task.priority === "Low" && !task.completed
+      task.priority === "Low" &&
+      !task.completed
   ).length;
 
   const completionRate =
@@ -87,7 +135,7 @@ export default function Analytics() {
   const COLORS = ["#22c55e", "#eab308"];
 
   // =========================
-  // Productivity insight
+  // Productivity Insight
   // =========================
 
   const getCompletionInsight = () => {
@@ -125,6 +173,31 @@ export default function Analytics() {
 
     return "You currently have no pending high-priority tasks.";
   };
+
+  // =========================
+  // Loading UI
+  // =========================
+
+  if (loading) {
+    return (
+      <>
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold">
+            📊 Analytics Dashboard
+          </h1>
+
+          <p className="text-gray-400 mt-2">
+            Understand your workload, priorities and task
+            completion progress.
+          </p>
+        </div>
+
+        <div className="bg-slate-800 rounded-2xl p-10 text-center text-gray-400">
+          Loading your analytics...
+        </div>
+      </>
+    );
+  }
 
   // =========================
   // UI
@@ -193,7 +266,9 @@ export default function Analytics() {
 
       {totalTasks === 0 ? (
         <div className="bg-slate-800 rounded-2xl p-10 text-center mb-10">
-          <div className="text-5xl mb-4">📊</div>
+          <div className="text-5xl mb-4">
+            📊
+          </div>
 
           <h2 className="text-xl font-bold">
             No analytics yet
@@ -229,12 +304,14 @@ export default function Analytics() {
                   outerRadius={90}
                   label
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell
-                      key={entry.name}
-                      fill={COLORS[index]}
-                    />
-                  ))}
+                  {pieData.map(
+                    (entry, index) => (
+                      <Cell
+                        key={entry.name}
+                        fill={COLORS[index]}
+                      />
+                    )
+                  )}
                 </Pie>
 
                 <Tooltip />

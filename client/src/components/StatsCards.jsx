@@ -9,7 +9,7 @@ export default function StatsCards({ tasks }) {
 
   const aiScore =
     totalTasks === 0
-      ? 100
+      ? 0
       : Math.round((completedTasks / totalTasks) * 100);
 
   const cards = [

@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { API_BASE_URL } from "../utils/api";
 
-import {
-  loadTasks,
-  saveTasks,
-} from "../utils/taskStorage";
+const API_URL = `${API_BASE_URL}/api/tasks`;
 
 export default function Settings() {
   const [backendStatus, setBackendStatus] =
@@ -13,9 +11,14 @@ export default function Settings() {
   const [geminiStatus, setGeminiStatus] =
     useState("checking");
 
-  const [totalTasks, setTotalTasks] = useState(
-    () => loadTasks().length
-  );
+  const [totalTasks, setTotalTasks] =
+    useState(0);
+
+  const [taskStorageStatus, setTaskStorageStatus] =
+    useState("checking");
+
+  const getToken = () =>
+    localStorage.getItem("focusflow_token");
 
   // =========================
   // Check Backend
@@ -25,7 +28,7 @@ export default function Settings() {
     const checkBackend = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/"
+         `${API_BASE_URL}/`
         );
 
         if (!response.ok) {
@@ -44,7 +47,10 @@ export default function Settings() {
             : "missing"
         );
       } catch (error) {
-        console.error("Backend health check failed:", error);
+        console.error(
+          "Backend health check failed:",
+          error
+        );
 
         setBackendStatus("offline");
         setGeminiStatus("unknown");
@@ -55,58 +61,150 @@ export default function Settings() {
   }, []);
 
   // =========================
+  // Load User's Task Count
+  // =========================
+
+  const loadTaskCount = async () => {
+    try {
+      setTaskStorageStatus("checking");
+
+      const response = await fetch(API_URL, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to load tasks."
+        );
+      }
+
+      setTotalTasks(data.tasks?.length || 0);
+
+      setTaskStorageStatus("active");
+    } catch (error) {
+      console.error(
+        "Task Storage Check Error:",
+        error
+      );
+
+      setTaskStorageStatus("offline");
+    }
+  };
+
+  useEffect(() => {
+    loadTaskCount();
+  }, []);
+
+  // =========================
   // Clear Tasks
   // =========================
 
-  const clearTasks = () => {
+  const clearTasks = async () => {
     const confirmDelete = window.confirm(
-      "Are you sure you want to delete all tasks?"
+      "Are you sure you want to delete all your tasks? This cannot be undone."
     );
 
     if (!confirmDelete) return;
 
-    saveTasks([]);
-    setTotalTasks(0);
+    try {
+      const response = await fetch(API_URL, {
+        method: "DELETE",
 
-    toast.success("All tasks cleared.");
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to clear tasks."
+        );
+      }
+
+      setTotalTasks(0);
+
+      toast.success("All tasks cleared.");
+    } catch (error) {
+      console.error(
+        "Clear Tasks Error:",
+        error
+      );
+
+      toast.error(error.message);
+    }
   };
 
   // =========================
   // Restore Demo Tasks
   // =========================
 
-  const resetTasks = () => {
+  const resetTasks = async () => {
     const demoTasks = [
       {
-        id: Date.now(),
         title: "Complete Project Documentation",
         priority: "High",
         deadline: getRelativeDate(1),
-        completed: false,
       },
 
       {
-        id: Date.now() + 1,
         title: "Practice LeetCode",
         priority: "Medium",
         deadline: getRelativeDate(2),
-        completed: false,
       },
 
       {
-        id: Date.now() + 2,
         title: "Review Machine Learning Notes",
         priority: "Low",
         deadline: getRelativeDate(4),
-        completed: true,
       },
     ];
 
-    saveTasks(demoTasks);
+    try {
+      const createdTasks = [];
 
-    setTotalTasks(demoTasks.length);
+      for (const task of demoTasks) {
+        const response = await fetch(API_URL, {
+          method: "POST",
 
-    toast.success("Demo tasks restored.");
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+
+          body: JSON.stringify(task),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Unable to restore demo tasks."
+          );
+        }
+
+        createdTasks.push(data.task);
+      }
+
+      setTotalTasks(
+        (prev) => prev + createdTasks.length
+      );
+
+      toast.success("Demo tasks restored.");
+    } catch (error) {
+      console.error(
+        "Restore Demo Tasks Error:",
+        error
+      );
+
+      toast.error(error.message);
+    }
   };
 
   // =========================
@@ -160,8 +258,8 @@ export default function Settings() {
           </div>
 
           <p className="text-xs text-gray-500 mt-5">
-            Demo tasks use dates relative to today so
-            deadline features remain useful during demos.
+            Task changes apply only to your FocusFlow
+            account.
           </p>
         </div>
 
@@ -208,9 +306,20 @@ export default function Settings() {
             />
 
             <StatusRow
-              label="Task Storage"
-              status="Active"
-              good={true}
+              label="MongoDB Task Storage"
+              status={
+                taskStorageStatus === "checking"
+                  ? "Checking..."
+                  : taskStorageStatus === "active"
+                  ? "Connected"
+                  : "Unavailable"
+              }
+              good={
+                taskStorageStatus === "active"
+              }
+              checking={
+                taskStorageStatus === "checking"
+              }
             />
           </div>
 
@@ -221,8 +330,8 @@ export default function Settings() {
               </p>
 
               <p className="text-gray-400 text-sm mt-1">
-                Start the FocusFlow server to use Gemini
-                AI features.
+                Start the FocusFlow server to use
+                database and Gemini AI features.
               </p>
             </div>
           )}
@@ -294,8 +403,6 @@ function StatusRow({
       >
         {checking
           ? `⏳ ${status}`
-          : good
-          ? `● ${status}`
           : `● ${status}`}
       </span>
     </div>
@@ -303,7 +410,7 @@ function StatusRow({
 }
 
 // =========================
-// Relative demo date
+// Relative Demo Date
 // =========================
 
 function getRelativeDate(daysFromToday) {

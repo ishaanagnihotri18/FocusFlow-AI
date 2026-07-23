@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import { API_BASE_URL } from "../utils/api";
 import SearchBar from "../components/tasks/SearchBar";
 import TaskFilters from "../components/tasks/TaskFilters";
 import TaskStats from "../components/tasks/TaskStats";
@@ -9,18 +9,15 @@ import FloatingAddButton from "../components/tasks/FloatingAddButton";
 import TaskCard from "../components/TaskCard";
 import AddTaskModal from "../components/AddTaskModal";
 
-import {
-  loadTasks,
-  saveTasks,
-} from "../utils/taskStorage";
+const API_URL = `${API_BASE_URL}/api/tasks`;
 
 export default function Tasks() {
-
   // ==========================
   // States
   // ==========================
 
-  const [tasks, setTasks] = useState(loadTasks);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
 
@@ -37,19 +34,51 @@ export default function Tasks() {
   });
 
   // ==========================
-  // Save Tasks
+  // Authentication Token
   // ==========================
 
+  const getToken = () =>
+    localStorage.getItem("focusflow_token");
+
+  // ==========================
+  // Load Tasks From MongoDB
+  // ==========================
+
+  const fetchTasks = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(API_URL, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to load tasks."
+        );
+      }
+
+      setTasks(data.tasks || []);
+    } catch (error) {
+      console.error("Load Tasks Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    saveTasks(tasks);
-  }, [tasks]);
+    fetchTasks();
+  }, []);
 
   // ==========================
   // Add Task
   // ==========================
 
-  const handleAddTask = () => {
-
+  const handleAddTask = async () => {
     if (
       !newTask.title.trim() ||
       !newTask.deadline
@@ -58,102 +87,169 @@ export default function Tasks() {
       return;
     }
 
-    const task = {
-      id: Date.now(),
-      title: newTask.title,
-      priority: newTask.priority,
-      deadline: newTask.deadline,
-      completed: false,
-    };
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
 
-    setTasks((prev) => [...prev, task]);
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
 
-    setNewTask({
-      title: "",
-      priority: "Medium",
-      deadline: "",
-    });
+        body: JSON.stringify({
+          title: newTask.title,
+          priority: newTask.priority,
+          deadline: newTask.deadline,
+        }),
+      });
 
-    setShowModal(false);
+      const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to create task."
+        );
+      }
+
+      setTasks((prev) => [
+        data.task,
+        ...prev,
+      ]);
+
+      setNewTask({
+        title: "",
+        priority: "Medium",
+        deadline: "",
+      });
+
+      setShowModal(false);
+    } catch (error) {
+      console.error("Add Task Error:", error);
+      alert(error.message);
+    }
   };
 
   // ==========================
   // Complete Task
   // ==========================
 
-  const toggleComplete = (id) => {
+  const toggleComplete = async (id) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/${id}/toggle`,
+        {
+          method: "PATCH",
 
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              completed: !task.completed,
-            }
-          : task
-      )
-    );
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        }
+      );
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to update task."
+        );
+      }
+
+      setTasks((prev) =>
+        prev.map((task) =>
+          task._id === id
+            ? data.task
+            : task
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Toggle Task Error:",
+        error
+      );
+
+      alert(error.message);
+    }
   };
 
   // ==========================
   // Delete Task
   // ==========================
 
-  const deleteTask = (id) => {
+  const deleteTask = async (id) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/${id}`,
+        {
+          method: "DELETE",
 
-    setTasks((prev) =>
-      prev.filter((task) => task.id !== id)
-    );
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        }
+      );
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to delete task."
+        );
+      }
+
+      setTasks((prev) =>
+        prev.filter(
+          (task) => task._id !== id
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Delete Task Error:",
+        error
+      );
+
+      alert(error.message);
+    }
   };
 
   // ==========================
   // Filter Tasks
   // ==========================
 
-  const filteredTasks = tasks.filter((task) => {
+  const filteredTasks = tasks.filter(
+    (task) => {
+      const matchesSearch =
+        task.title
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
-    const matchesSearch =
-      task.title
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesFilter =
+        activeFilter === "All"
+          ? true
+          : activeFilter === "Completed"
+          ? task.completed
+          : activeFilter === "Pending"
+          ? !task.completed
+          : task.priority === activeFilter;
 
-    const matchesFilter =
-      activeFilter === "All"
-        ? true
-        : activeFilter === "Completed"
-        ? task.completed
-        : activeFilter === "Pending"
-        ? !task.completed
-        : task.priority === activeFilter;
-
-    return (
-      matchesSearch &&
-      matchesFilter
-    );
-
-  });
+      return matchesSearch && matchesFilter;
+    }
+  );
 
   return (
     <>
-          {/* Header */}
+      {/* Header */}
 
       <div className="flex justify-between items-center mb-8">
-
         <div>
-
           <h1 className="text-4xl font-bold">
             📋 Task Manager
           </h1>
 
           <p className="text-gray-400 mt-2">
-            Manage, organize and complete your daily tasks efficiently.
+            Manage, organize and complete your daily
+            tasks efficiently.
           </p>
-
         </div>
-
       </div>
 
       {/* Search */}
@@ -176,27 +272,23 @@ export default function Tasks() {
 
       {/* Tasks */}
 
-      {filteredTasks.length === 0 ? (
-
+      {loading ? (
+        <div className="text-center py-16 text-gray-400">
+          Loading your tasks...
+        </div>
+      ) : filteredTasks.length === 0 ? (
         <EmptyState />
-
       ) : (
-
         <div className="space-y-5">
-
           {filteredTasks.map((task) => (
-
             <TaskCard
-              key={task.id}
+              key={task._id}
               task={task}
               toggleComplete={toggleComplete}
               deleteTask={deleteTask}
             />
-
           ))}
-
         </div>
-
       )}
 
       {/* Floating Add Button */}
@@ -214,6 +306,6 @@ export default function Tasks() {
         setNewTask={setNewTask}
         handleAddTask={handleAddTask}
       />
-          </>
+    </>
   );
 }

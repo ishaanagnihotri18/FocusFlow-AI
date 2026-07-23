@@ -1,15 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { API_BASE_URL } from "../utils/api";
 
-import {
-  loadTasks,
-  saveTasks,
-} from "../utils/taskStorage";
+const API_URL = `${API_BASE_URL}/api/tasks`;
 
 export default function CalendarPage() {
   const today = new Date();
 
-  const [tasks, setTasks] = useState(() => loadTasks());
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [currentDate, setCurrentDate] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
@@ -41,6 +40,46 @@ export default function CalendarPage() {
       year: "numeric",
     });
   }
+
+  // =========================
+  // MongoDB task helpers
+  // =========================
+
+  const getToken = () => localStorage.getItem("focusflow_token");
+
+  const getTaskDateKey = (deadline) => {
+    if (!deadline) return "";
+    return String(deadline).slice(0, 10);
+  };
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+
+        const response = await fetch(API_URL, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Unable to load calendar tasks.");
+        }
+
+        setTasks(data.tasks || []);
+      } catch (error) {
+        console.error("Calendar Load Error:", error);
+        toast.error(error.message || "Unable to load calendar tasks.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, []);
 
   // =========================
   // Calendar calculations
@@ -77,7 +116,7 @@ export default function CalendarPage() {
   // =========================
 
   const selectedTasks = tasks.filter(
-    (task) => task.deadline === selectedDate
+    (task) => getTaskDateKey(task.deadline) === selectedDate
   );
 
   // =========================
@@ -93,11 +132,11 @@ export default function CalendarPage() {
   const overdueTasks = pendingTasks.filter(
     (task) =>
       task.deadline &&
-      task.deadline < todayKey
+      getTaskDateKey(task.deadline) < todayKey
   );
 
   const dueTodayTasks = pendingTasks.filter(
-    (task) => task.deadline === todayKey
+    (task) => getTaskDateKey(task.deadline) === todayKey
   );
 
   const upcomingTasks = useMemo(() => {
@@ -106,10 +145,10 @@ export default function CalendarPage() {
         (task) =>
           !task.completed &&
           task.deadline &&
-          task.deadline > todayKey
+          getTaskDateKey(task.deadline) > todayKey
       )
       .sort((a, b) =>
-        a.deadline.localeCompare(b.deadline)
+        getTaskDateKey(a.deadline).localeCompare(getTaskDateKey(b.deadline))
       )
       .slice(0, 5);
   }, [tasks, todayKey]);
@@ -146,20 +185,32 @@ export default function CalendarPage() {
   // Complete task
   // =========================
 
-  const toggleComplete = (id) => {
-    const updatedTasks = tasks.map((task) =>
-      task.id === id
-        ? {
-            ...task,
-            completed: !task.completed,
-          }
-        : task
-    );
+  const toggleComplete = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/${id}/toggle`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
 
-    setTasks(updatedTasks);
-    saveTasks(updatedTasks);
+      const data = await response.json();
 
-    toast.success("Task updated!");
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to update task.");
+      }
+
+      setTasks((prev) =>
+        prev.map((task) =>
+          task._id === id ? data.task : task
+        )
+      );
+
+      toast.success("Task updated!");
+    } catch (error) {
+      console.error("Calendar Toggle Error:", error);
+      toast.error(error.message || "Unable to update task.");
+    }
   };
 
   // =========================
@@ -300,7 +351,7 @@ export default function CalendarPage() {
               const dateKey = formatDateKey(date);
 
               const dayTasks = tasks.filter(
-                (task) => task.deadline === dateKey
+                (task) => getTaskDateKey(task.deadline) === dateKey
               );
 
               const isToday = dateKey === todayKey;
@@ -342,7 +393,7 @@ export default function CalendarPage() {
                   <div className="flex gap-1 mt-4 flex-wrap">
                     {dayTasks.slice(0, 4).map((task) => (
                       <span
-                        key={task.id}
+                        key={task._id}
                         title={task.title}
                         className={`w-2.5 h-2.5 rounded-full ${
                           task.completed
@@ -418,7 +469,7 @@ export default function CalendarPage() {
             ) : (
               selectedTasks.map((task) => (
                 <div
-                  key={task.id}
+                  key={task._id}
                   className="bg-slate-900 border border-slate-700 rounded-xl p-5"
                 >
                   <div className="flex gap-3">
@@ -451,7 +502,7 @@ export default function CalendarPage() {
 
                   <button
                     onClick={() =>
-                      toggleComplete(task.id)
+                      toggleComplete(task._id)
                     }
                     className={`w-full mt-4 py-2.5 rounded-lg font-semibold transition ${
                       task.completed
@@ -561,7 +612,7 @@ function WorkloadCard({
         <div className="space-y-3 mt-5">
           {tasks.map((task) => (
             <div
-              key={task.id}
+              key={task._id}
               className="bg-slate-900 rounded-xl p-4 flex items-center justify-between gap-4"
             >
               <div className="min-w-0">
@@ -577,8 +628,8 @@ function WorkloadCard({
                   }`}
                 >
                   {type === "overdue"
-                    ? `Overdue • ${task.deadline}`
-                    : `Due ${task.deadline}`}
+                    ? `Overdue • ${String(task.deadline).slice(0, 10)}`
+                    : `Due ${String(task.deadline).slice(0, 10)}`}
                 </p>
               </div>
 
