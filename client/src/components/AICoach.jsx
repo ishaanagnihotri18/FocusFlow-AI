@@ -1,28 +1,43 @@
 import { useNavigate } from "react-router-dom";
 
-export default function AICoach({ tasks }) {
+export default function AICoach({ tasks = [] }) {
   const navigate = useNavigate();
 
   const completed = tasks.filter((task) => task.completed).length;
   const pending = tasks.length - completed;
+
   const highPriority = tasks.filter(
-    (task) => task.priority === "High"
+    (task) => task.priority === "High" && !task.completed
   ).length;
 
+  // Productivity should be 0 when there are no tasks
   const productivity =
     tasks.length === 0
-      ? 100
+      ? 0
       : Math.round((completed / tasks.length) * 100);
 
   let recommendation = "";
 
-  if (highPriority > 0) {
+  // No tasks
+  if (tasks.length === 0) {
     recommendation =
-      "Complete your high-priority tasks first before moving to medium or low-priority work.";
-  } else if (pending > 0) {
+      "Add your first task to get started. Your AI Coach will analyze your workload and help you decide what to focus on.";
+  }
+
+  // Pending high-priority tasks
+  else if (highPriority > 0) {
     recommendation =
-      "You're making good progress. Finish your pending tasks to stay on schedule.";
-  } else {
+      "You have high-priority work waiting. Focus on those tasks first before moving to medium or low-priority work.";
+  }
+
+  // Other pending tasks
+  else if (pending > 0) {
+    recommendation =
+      "You're making good progress. Finish your remaining tasks to stay on schedule.";
+  }
+
+  // Tasks exist and all are completed
+  else {
     recommendation =
       "Excellent work! You've completed all your tasks. Keep up the momentum!";
   }
@@ -40,6 +55,7 @@ export default function AICoach({ tasks }) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
+        {/* Pending */}
         <div className="bg-slate-900 rounded-xl p-5">
           <p className="text-sm text-gray-400">
             Pending
@@ -50,6 +66,7 @@ export default function AICoach({ tasks }) {
           </p>
         </div>
 
+        {/* Completed */}
         <div className="bg-slate-900 rounded-xl p-5">
           <p className="text-sm text-gray-400">
             Completed
@@ -60,6 +77,7 @@ export default function AICoach({ tasks }) {
           </p>
         </div>
 
+        {/* High Priority */}
         <div className="bg-slate-900 rounded-xl p-5">
           <p className="text-sm text-gray-400">
             High Priority
@@ -70,6 +88,7 @@ export default function AICoach({ tasks }) {
           </p>
         </div>
 
+        {/* Productivity */}
         <div className="bg-slate-900 rounded-xl p-5">
           <p className="text-sm text-gray-400">
             Productivity
@@ -82,6 +101,7 @@ export default function AICoach({ tasks }) {
 
       </div>
 
+      {/* Recommendation */}
       <div className="mt-8 bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-6">
 
         <h3 className="text-xl font-bold text-cyan-400 mb-3">
@@ -94,6 +114,7 @@ export default function AICoach({ tasks }) {
 
       </div>
 
+      {/* AI Planner */}
       <div className="mt-8 flex justify-end">
 
         <button
